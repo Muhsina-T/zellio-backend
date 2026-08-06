@@ -39,6 +39,7 @@ const wishlistRoutes = require("./routes/wishlistRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const userRoutes = require("./routes/userRoutes");
 const returnRoutes = require("./routes/returnRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 app.use(cors());
 app.use(express.json());
@@ -49,6 +50,7 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/returns", returnRoutes);
+app.use("/api/payment", paymentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Zellio Backend Running");
