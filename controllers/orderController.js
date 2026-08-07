@@ -52,26 +52,40 @@ const createOrder = async (req, res) => {
 
     const orderDate = req.body.date || new Date().toISOString();
 
-    const order = await Order.create({
-      ...req.body,
-      items,
-      user: userId,
-      date: orderDate,
-    });
+   const order = await Order.create({
+  ...req.body,
+  items,
+  user: userId,
+  date: orderDate,
+});
 
-    for (const item of items) {
-      const product = await Product.findById(item.product);
-      if (product) {
-        product.stock = Math.max(0, (product.stock || 0) - item.quantity);
-        await product.save();
-      }
-    }
 
-    await Cart.findOneAndUpdate(
-      { user: userId },
-      { items: [] },
-      { new: true, upsert: true }
+// Reduce product stock
+for (const item of items) {
+
+  const product = await Product.findById(item.product);
+
+  if (product) {
+
+    product.stock = Math.max(
+      0,
+      (product.stock || 0) - item.quantity
     );
+
+    await product.save();
+  }
+}
+
+
+// Clear cart after order creation
+await Cart.findOneAndUpdate(
+  { user: userId },
+  { items: [] },
+  {
+    returnDocument: "after",
+    upsert: true,
+  }
+);
 
     const populatedOrder = await Order.findById(order._id).populate(
       "items.product"
@@ -91,17 +105,26 @@ const updateOrderStatus = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to update orders" });
+      return res.status(401).json({
+        message: "Please log in to update orders",
+      });
     }
 
     const order = await Order.findById(req.params.id);
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({
+        message: "Order not found",
+      });
     }
 
-    if (order.user.toString() !== userId && req.user?.role !== "admin") {
-      return res.status(403).json({ message: "You can only update your own orders" });
+    if (
+      order.user.toString() !== userId &&
+      req.user?.role !== "admin"
+    ) {
+      return res.status(403).json({
+        message: "You can only update your own orders",
+      });
     }
 
     const updatePayload = {
@@ -116,12 +139,13 @@ const updateOrderStatus = async (req, res) => {
       req.params.id,
       updatePayload,
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     ).populate("items.product");
 
     res.status(200).json(updatedOrder);
+
   } catch (error) {
     res.status(500).json({
       message: error.message,

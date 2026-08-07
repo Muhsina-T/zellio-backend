@@ -147,11 +147,14 @@ const clearCart = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const updatedCart = await Cart.findOneAndUpdate(
-      { user: userId },
-      { items: [] },
-      { new: true, upsert: true }
-    ).populate("items.product");
+   const updatedCart = await Cart.findOneAndUpdate(
+  { user: userId },
+  { items: [] },
+  { 
+    returnDocument: "after",
+    upsert: true
+  }
+).populate("items.product");
 
     res.json(updatedCart || { user: userId, items: [] });
   } catch (error) {

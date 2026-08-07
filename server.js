@@ -55,7 +55,7 @@ app.use("/api/payment", paymentRoutes);
 app.get("/", (req, res) => {
   res.send("Zellio Backend Running");
 });
-console.log(process.env.MONGO_URI);
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

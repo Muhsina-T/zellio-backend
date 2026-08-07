@@ -14,7 +14,9 @@ const getReturns = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to view your returns" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to view your returns" });
     }
 
     const query = req.user?.role === "admin" ? {} : { user: userId };
@@ -39,7 +41,9 @@ const getUserReturns = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to view your returns" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to view your returns" });
     }
 
     const returns = await Return.find({
@@ -62,13 +66,17 @@ const createReturn = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to request a return" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to request a return" });
     }
 
     const { order, product, reason } = req.body;
 
     if (!order || !product || !reason) {
-      return res.status(400).json({ message: "Order, product, and reason are required" });
+      return res
+        .status(400)
+        .json({ message: "Order, product, and reason are required" });
     }
 
     if (!mongoose.Types.ObjectId.isValid(order)) {
@@ -118,8 +126,8 @@ const updateReturnStatus = async (req, res) => {
         status: req.body.status,
       },
       {
-        new: true,
-      }
+        returnDocument: "after",
+      },
     )
       .populate("user")
       .populate("product")
