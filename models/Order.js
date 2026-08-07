@@ -36,10 +36,37 @@ const orderSchema = new mongoose.Schema(
       address: String,
     },
 
+
+    // Change this section
     payment: {
-      type: String,
-      default: "Cash on Delivery",
+      method: {
+        type: String,
+        default: "Cash on Delivery",
+      },
+
+      status: {
+        type: String,
+        enum: [
+          "Pending",
+          "Paid",
+          "Failed",
+        ],
+        default: "Pending",
+      },
+
+      razorpayOrderId: {
+        type: String,
+      },
+
+      razorpayPaymentId: {
+        type: String,
+      },
+
+      razorpaySignature: {
+        type: String,
+      },
     },
+
 
     total: {
       type: Number,

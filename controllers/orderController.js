@@ -52,12 +52,30 @@ const createOrder = async (req, res) => {
 
     const orderDate = req.body.date || new Date().toISOString();
 
-   const order = await Order.create({
+  const order = await Order.create({
   ...req.body,
+
   items,
+
   user: userId,
+
   date: orderDate,
+
+  payment: {
+    method: typeof req.body.payment === "string" 
+      ? (req.body.payment === "COD" ? "Cash on Delivery" : req.body.payment)
+      : (req.body.payment?.method || "Cash on Delivery"),
+
+    status: (typeof req.body.payment === "string" && (req.body.payment === "Card" || req.body.payment === "Razorpay"))
+      ? "Paid"
+      : (req.body.payment?.method === "Razorpay" || req.body.payment?.method === "Card" ? "Paid" : "Pending"),
+
+    razorpayOrderId: req.body.payment?.razorpayOrderId,
+    razorpayPaymentId: req.body.payment?.razorpayPaymentId,
+    razorpaySignature: req.body.payment?.razorpaySignature,
+  },
 });
+
 
 
 // Reduce product stock
@@ -215,10 +233,41 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+// UPDATE PAYMENT DETAILS AFTER RAZORPAY SUCCESS
+const updatePayment = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found",
+      });
+    }
+
+    order.payment.method = "Razorpay";
+    order.payment.status = "Paid";
+    order.payment.razorpayOrderId = req.body.razorpayOrderId;
+    order.payment.razorpayPaymentId = req.body.razorpayPaymentId;
+    order.payment.razorpaySignature = req.body.razorpaySignature;
+
+    await order.save();
+
+    res.status(200).json({
+      message: "Payment updated successfully",
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrder,
   createOrder,
   updateOrderStatus,
   deleteOrder,
+  updatePayment,
 };

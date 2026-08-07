@@ -8,56 +8,61 @@ const User = require("./models/User");
 
 const app = express();
 
+app.use(cors());
+app.use(express.json());
+
+// Seed default admin
 const seedDefaultAdmin = async () => {
   try {
-    const existingAdmin = await User.findOne({ email: "admin@zellio.com" });
+    const existingAdmin = await User.findOne({
+      email: "admin@zellio.com",
+    });
 
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash("admin123", 10);
+
       await User.create({
         name: "Admin",
         email: "admin@zellio.com",
         password: hashedPassword,
         role: "admin",
       });
-      console.log("Default admin user created");
+
+      console.log("✅ Default admin created");
     } else if (existingAdmin.role !== "admin") {
       existingAdmin.role = "admin";
       await existingAdmin.save();
-      console.log("Existing admin user role fixed to admin");
+
+      console.log("✅ Admin role updated");
     }
-  } catch (error) {
-    console.error("Admin seed error:", error);
+  } catch (err) {
+    console.error("❌ Admin seed error:", err.message);
   }
 };
 
-connectDB().then(() => seedDefaultAdmin());
-
-const productRoutes = require("./routes/productRoutes");
-const cartRoutes = require("./routes/cartRoutes");
-const wishlistRoutes = require("./routes/wishlistRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const userRoutes = require("./routes/userRoutes");
-const returnRoutes = require("./routes/returnRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
-
-app.use(cors());
-app.use(express.json());
-
-app.use("/api/products", productRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/returns", returnRoutes);
-app.use("/api/payment", paymentRoutes);
+// Routes
+app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/cart", require("./routes/cartRoutes"));
+app.use("/api/wishlist", require("./routes/wishlistRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/returns", require("./routes/returnRoutes"));
+app.use("/api/payment", require("./routes/paymentRoutes"));
 
 app.get("/", (req, res) => {
-  res.send("Zellio Backend Running");
+  res.send("Zellio Backend Running 🚀");
 });
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+connectDB()
+  .then(async () => {
+    await seedDefaultAdmin();
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Database connection failed:", err);
+  });

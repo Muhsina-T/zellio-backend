@@ -4,9 +4,14 @@ const User = require("../models/User");
 
 const createToken = (user) => {
   return jwt.sign(
-    { id: user._id.toString() },
+    {
+      id: user._id.toString(),
+      role: user.role,
+    },
     process.env.JWT_SECRET || "zellio_secret_key",
-    { expiresIn: "7d" }
+    {
+      expiresIn: "7d",
+    }
   );
 };
 
@@ -15,16 +20,23 @@ const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({
+        message: "All fields are required",
+      });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+    });
 
     if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
+      return res.status(400).json({
+        message: "Email already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await User.create({
       name,
       email: email.toLowerCase(),
@@ -33,17 +45,21 @@ const registerUser = async (req, res) => {
     });
 
     const token = createToken(user);
-    const safeUser = {
-      _id: user._id,
-      id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    };
 
-    res.status(201).json({ user: safeUser, token });
+    res.status(201).json({
+      user: {
+        _id: user._id,
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      token,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
@@ -52,38 +68,59 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    });
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
     }
 
     const token = createToken(user);
-    const safeUser = {
-      _id: user._id,
-      id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      role: user.role || (user.email === "admin@zellio.com" ? "admin" : "user"),
-    };
 
-    res.status(200).json({ user: safeUser, token });
+    res.status(200).json({
+      user: {
+        _id: user._id,
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      token,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
 const getMe = async (req, res) => {
-  res.status(200).json(req.user);
+  res.status(200).json({
+    _id: req.user._id,
+    id: req.user._id.toString(),
+    name: req.user.name,
+    email: req.user.email,
+    role: req.user.role,
+  });
 };
 
 module.exports = {

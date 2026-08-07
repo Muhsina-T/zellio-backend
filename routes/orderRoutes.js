@@ -11,6 +11,7 @@ const {
   createOrder,
   updateOrderStatus,
   deleteOrder,
+  updatePayment,
 } = require("../controllers/orderController");
 
 
@@ -32,6 +33,12 @@ router.put("/:id", updateOrderStatus);
 
 // Delete order
 router.delete("/:id", deleteOrder);
+
+router.put(
+  "/:id/payment",
+  protect,
+  updatePayment
+);
 
 
 module.exports = router;
