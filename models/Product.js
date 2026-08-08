@@ -26,6 +26,16 @@ const productSchema = new mongoose.Schema(
     description: String,
 
     stock: Number,
+
+    variants: [
+      {
+        id: Number,
+        storage: String,
+        color: String,
+        price: Number,
+        image: String,
+      },
+    ],
   },
   {
     timestamps: true,
