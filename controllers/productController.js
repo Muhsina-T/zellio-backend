@@ -1,9 +1,48 @@
 const Product = require("../models/Product");
 
-// GET ALL PRODUCTS
+// GET ALL PRODUCTS + SEARCH
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find();
+    const { search } = req.query;
+
+    const pipeline = [];
+
+    // SEARCH
+    if (search && search.trim() !== "") {
+      pipeline.push({
+        $match: {
+          $or: [
+            {
+              name: {
+                $regex: search,
+                $options: "i",
+              },
+            },
+            {
+              brand: {
+                $regex: search,
+                $options: "i",
+              },
+            },
+            {
+              description: {
+                $regex: search,
+                $options: "i",
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // SORT
+    pipeline.push({
+      $sort: {
+        createdAt: -1,
+      },
+    });
+
+    const products = await Product.aggregate(pipeline);
 
     res.status(200).json(products);
   } catch (error) {
@@ -98,4 +137,5 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  
 };

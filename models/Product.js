@@ -11,7 +11,13 @@ const productSchema = new mongoose.Schema(
 
     category: String,
 
-    price: Number,
+    // Keep this temporarily because your existing
+    // frontend uses product.price
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
     image: String,
 
@@ -30,16 +36,30 @@ const productSchema = new mongoose.Schema(
     variants: [
       {
         id: Number,
+
         storage: String,
+
         color: String,
-        price: Number,
+
+        costPrice: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+
         image: String,
       },
     ],
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 module.exports = mongoose.model("Product", productSchema);

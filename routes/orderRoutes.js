@@ -7,6 +7,7 @@ router.use(protect);
 
 const {
   getOrders,
+  getAllOrders,
   getOrder,
   createOrder,
   updateOrderStatus,
@@ -15,30 +16,56 @@ const {
 } = require("../controllers/orderController");
 
 
+// =============================
+// CUSTOMER ORDERS
+// =============================
+
 // Get logged-in user's orders
 router.get("/", getOrders);
 
+
+// =============================
+// ADMIN ORDERS
+// =============================
+
+// Get all orders for admin analytics
+router.get("/admin/all", getAllOrders);
+
+
+// =============================
+// SINGLE ORDER
+// =============================
 
 // Get single order
 router.get("/:id", getOrder);
 
 
-// Create order
+// =============================
+// CREATE ORDER
+// =============================
+
 router.post("/", createOrder);
 
 
-// Update order status
+// =============================
+// UPDATE ORDER
+// =============================
+
 router.put("/:id", updateOrderStatus);
 
 
-// Delete order
+// =============================
+// DELETE ORDER
+// =============================
+
 router.delete("/:id", deleteOrder);
 
-router.put(
-  "/:id/payment",
-  protect,
-  updatePayment
-);
+
+// =============================
+// UPDATE PAYMENT
+// =============================
+
+router.put("/:id/payment", updatePayment);
 
 
 module.exports = router;

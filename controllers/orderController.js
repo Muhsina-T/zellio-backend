@@ -6,13 +6,33 @@ const getAuthUserId = (req) => {
   return req.user._id.toString();
 };
 
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("user")
+      .populate("items.product")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+   
+  } catch (error) {
+    console.error("Get all orders error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
 // GET ALL ORDERS OF A USER
 const getOrders = async (req, res) => {
   try {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to view your orders" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to view your orders" });
     }
 
     const query = req.user?.role === "admin" ? {} : { user: userId };
@@ -35,82 +55,173 @@ const createOrder = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to place an order" });
+      return res.status(401).json({
+        message: "Please log in to place an order",
+      });
     }
 
-    const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+    const rawItems = Array.isArray(req.body.items)
+      ? req.body.items
+      : [];
 
     if (rawItems.length === 0) {
-      return res.status(400).json({ message: "Order items are required" });
+      return res.status(400).json({
+        message: "Order items are required",
+      });
     }
 
-    const items = rawItems.map((item) => ({
-      product:
-        item.product?._id || item.product?.id || item.product,
-      quantity: item.quantity || 1,
-    }));
+    const items = [];
+    const productsToUpdate = [];
 
-    const orderDate = req.body.date || new Date().toISOString();
+    // -----------------------------
+    // 1. VALIDATE ALL PRODUCTS FIRST
+    // -----------------------------
 
-  const order = await Order.create({
-  ...req.body,
+    for (const item of rawItems) {
+      const productId =
+        item.product?._id ||
+        item.product?.id ||
+        item.product;
 
-  items,
+      const product = await Product.findById(productId);
 
-  user: userId,
+      if (!product) {
+        return res.status(404).json({
+          message: "Product not found",
+        });
+      }
 
-  date: orderDate,
+      // Completely out of stock
+      if ((product.stock || 0) <= 0) {
+        return res.status(400).json({
+          message: `${product.name} is out of stock`,
+        });
+      }
 
-  payment: {
-    method: typeof req.body.payment === "string" 
-      ? (req.body.payment === "COD" ? "Cash on Delivery" : req.body.payment)
-      : (req.body.payment?.method || "Cash on Delivery"),
+      const variant = product.variants?.find(
+        (v) => v.id === Number(item.variantId)
+      );
 
-    status: (typeof req.body.payment === "string" && (req.body.payment === "Card" || req.body.payment === "Razorpay"))
-      ? "Paid"
-      : (req.body.payment?.method === "Razorpay" || req.body.payment?.method === "Card" ? "Paid" : "Pending"),
+      if (!variant) {
+        return res.status(404).json({
+          message: `Variant not found for ${product.name}`,
+        });
+      }
 
-    razorpayOrderId: req.body.payment?.razorpayOrderId,
-    razorpayPaymentId: req.body.payment?.razorpayPaymentId,
-    razorpaySignature: req.body.payment?.razorpaySignature,
-  },
-});
+      const quantity = Number(item.quantity) || 1;
 
+      // Not enough stock
+      if (product.stock < quantity) {
+        return res.status(400).json({
+          message: `Only ${product.stock} ${product.name} available`,
+        });
+      }
 
+      items.push({
+        product: product._id,
+        variantId: variant.id,
+        storage: variant.storage,
+        color: variant.color,
+        costPrice: Number(variant.costPrice || 0),
+        sellingPrice: Number(variant.price || product.price),
+        quantity,
+      });
 
-// Reduce product stock
-for (const item of items) {
+      productsToUpdate.push({
+        product,
+        quantity,
+      });
+    }
 
-  const product = await Product.findById(item.product);
+    // -----------------------------
+    // 2. REDUCE STOCK ONLY AFTER
+    //    ALL PRODUCTS ARE VALID
+    // -----------------------------
 
-  if (product) {
+    for (const item of productsToUpdate) {
+      item.product.stock -= item.quantity;
 
-    product.stock = Math.max(
-      0,
-      (product.stock || 0) - item.quantity
+      await item.product.save();
+    }
+
+    // -----------------------------
+    // 3. CREATE ORDER
+    // -----------------------------
+
+    const orderDate =
+      req.body.date || new Date().toISOString();
+
+    const order = await Order.create({
+      user: userId,
+
+      orderNumber: `ZEL-${Date.now()}`,
+
+      items,
+
+      address: req.body.address,
+
+      total: req.body.total,
+
+      date: orderDate,
+
+      payment: {
+        method:
+          typeof req.body.payment === "string"
+            ? req.body.payment === "COD"
+              ? "Cash on Delivery"
+              : req.body.payment
+            : req.body.payment?.method ||
+              "Cash on Delivery",
+
+        status:
+          typeof req.body.payment === "string" &&
+          (
+            req.body.payment === "Card" ||
+            req.body.payment === "Razorpay"
+          )
+            ? "Paid"
+            : req.body.payment?.method === "Razorpay" ||
+              req.body.payment?.method === "Card"
+              ? "Paid"
+              : "Pending",
+
+        razorpayOrderId:
+          req.body.payment?.razorpayOrderId,
+
+        razorpayPaymentId:
+          req.body.payment?.razorpayPaymentId,
+
+        razorpaySignature:
+          req.body.payment?.razorpaySignature,
+      },
+    });
+
+    // -----------------------------
+    // 4. CLEAR CART
+    // -----------------------------
+
+    await Cart.findOneAndUpdate(
+      { user: userId },
+      { items: [] },
+      {
+        returnDocument: "after",
+        upsert: true,
+      }
     );
 
-    await product.save();
-  }
-}
+    // -----------------------------
+    // 5. RETURN ORDER
+    // -----------------------------
 
-
-// Clear cart after order creation
-await Cart.findOneAndUpdate(
-  { user: userId },
-  { items: [] },
-  {
-    returnDocument: "after",
-    upsert: true,
-  }
-);
-
-    const populatedOrder = await Order.findById(order._id).populate(
-      "items.product"
-    );
+    const populatedOrder =
+      await Order.findById(order._id)
+        .populate("items.product");
 
     res.status(201).json(populatedOrder);
+
   } catch (error) {
+    console.error("Create order error:", error);
+
     res.status(500).json({
       message: error.message,
     });
@@ -136,10 +247,7 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    if (
-      order.user.toString() !== userId &&
-      req.user?.role !== "admin"
-    ) {
+    if (order.user.toString() !== userId && req.user?.role !== "admin") {
       return res.status(403).json({
         message: "You can only update your own orders",
       });
@@ -159,11 +267,10 @@ const updateOrderStatus = async (req, res) => {
       {
         returnDocument: "after",
         runValidators: true,
-      }
+      },
     ).populate("items.product");
 
     res.status(200).json(updatedOrder);
-
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -177,12 +284,12 @@ const getOrder = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to view this order" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to view this order" });
     }
 
-    const order = await Order.findById(req.params.id).populate(
-      "items.product"
-    );
+    const order = await Order.findById(req.params.id).populate("items.product");
 
     if (!order) {
       return res.status(404).json({
@@ -191,7 +298,9 @@ const getOrder = async (req, res) => {
     }
 
     if (order.user.toString() !== userId && req.user?.role !== "admin") {
-      return res.status(403).json({ message: "You can only view your own orders" });
+      return res
+        .status(403)
+        .json({ message: "You can only view your own orders" });
     }
 
     res.status(200).json(order);
@@ -208,7 +317,9 @@ const deleteOrder = async (req, res) => {
     const userId = getAuthUserId(req);
 
     if (!userId) {
-      return res.status(401).json({ message: "Please log in to delete orders" });
+      return res
+        .status(401)
+        .json({ message: "Please log in to delete orders" });
     }
 
     const order = await Order.findById(req.params.id);
@@ -218,7 +329,9 @@ const deleteOrder = async (req, res) => {
     }
 
     if (order.user.toString() !== userId && req.user?.role !== "admin") {
-      return res.status(403).json({ message: "You can only delete your own orders" });
+      return res
+        .status(403)
+        .json({ message: "You can only delete your own orders" });
     }
 
     await Order.findByIdAndDelete(req.params.id);
@@ -265,6 +378,7 @@ const updatePayment = async (req, res) => {
 
 module.exports = {
   getOrders,
+  getAllOrders,
   getOrder,
   createOrder,
   updateOrderStatus,
