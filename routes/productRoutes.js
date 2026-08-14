@@ -11,7 +11,7 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
-} = require("../controllers/ProductController");
+} = require("../controllers/productController");
 
 // GET ALL PRODUCTS + SEARCH
 router.get("/", getProducts);
